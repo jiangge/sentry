@@ -201,8 +201,6 @@ class Search extends React.Component {
 
           this.saveQueryMetrics(searchQuery);
 
-          console.log('sources', sources);
-
           return (
             <SearchWrapper>
               {renderInput({

@@ -17,9 +17,10 @@ import {
 } from './dataPrivacyRulesPanelSelectorFieldTypes';
 
 type State = {
-  showOptions: boolean;
   suggestions: Suggestions;
   fieldValues: Array<Suggestion | string>;
+  activeSuggestion: number;
+  showSuggestions: boolean;
 };
 
 type Props = {
@@ -34,7 +35,8 @@ class DataPrivacyRulesPanelSelectorField extends React.Component<Props, State> {
   state: State = {
     suggestions: [],
     fieldValues: [],
-    showOptions: false,
+    activeSuggestion: 0,
+    showSuggestions: false,
   };
 
   componentWillMount() {
@@ -50,24 +52,6 @@ class DataPrivacyRulesPanelSelectorField extends React.Component<Props, State> {
   }
 
   selectorField = React.createRef<HTMLDivElement>();
-
-  loadFieldValues = (newValue: string) => {
-    const splittedValue = newValue.split(' ');
-    const fieldValues: Array<Suggestion | string> = [];
-
-    for (const index in splittedValue) {
-      const value = splittedValue[index];
-      const selector = selectors.find(s => s.value === value);
-      fieldValues.push(selector ? selector : value);
-    }
-
-    const newSuggestions = this.getNewSuggestions(fieldValues);
-
-    this.setState({
-      fieldValues,
-      suggestions: newSuggestions,
-    });
-  };
 
   getNewSuggestions = (fieldValues: Array<Suggestion | string>) => {
     const lastFieldValue = fieldValues[fieldValues.length - 1];
@@ -98,6 +82,25 @@ class DataPrivacyRulesPanelSelectorField extends React.Component<Props, State> {
     return filteredSuggestions;
   };
 
+  loadFieldValues = (newValue: string) => {
+    const splittedValue = newValue.split(' ');
+    const fieldValues: Array<Suggestion | string> = [];
+
+    for (const index in splittedValue) {
+      const value = splittedValue[index];
+      const selector = selectors.find(s => s.value === value);
+      fieldValues.push(selector ? selector : value);
+    }
+
+    const newSuggestions = this.getNewSuggestions(fieldValues);
+
+    this.setState({
+      fieldValues,
+      suggestions: newSuggestions,
+      activeSuggestion: 0,
+    });
+  };
+
   handleChange = (newValue: string) => {
     this.loadFieldValues(newValue);
     this.props.onChange(newValue);
@@ -113,31 +116,8 @@ class DataPrivacyRulesPanelSelectorField extends React.Component<Props, State> {
     }
 
     this.setState({
-      showOptions: false,
+      showSuggestions: false,
     });
-  };
-
-  handleClickSuggestionItem = (suggestion: Suggestion) => () => {
-    let fieldValues = [...this.state.fieldValues];
-    const lastFieldValue = fieldValues[fieldValues.length - 1];
-
-    if (defined(lastFieldValue)) {
-      fieldValues[fieldValues.length - 1] = suggestion;
-    }
-
-    if (!defined(lastFieldValue)) {
-      fieldValues = [suggestion];
-    }
-
-    this.setState(
-      {
-        fieldValues,
-        showOptions: false,
-      },
-      () => {
-        this.handleChangeParentValue();
-      }
-    );
   };
 
   handleChangeParentValue = () => {
@@ -157,25 +137,74 @@ class DataPrivacyRulesPanelSelectorField extends React.Component<Props, State> {
     onChange(newValue.join(' '));
   };
 
-  handleFocus = () => {
-    this.setState({
-      showOptions: true,
-    });
+  handleClickSuggestionItem = (suggestion: Suggestion) => () => {
+    let fieldValues = [...this.state.fieldValues];
+    const lastFieldValue = fieldValues[fieldValues.length - 1];
+
+    if (defined(lastFieldValue)) {
+      fieldValues[fieldValues.length - 1] = suggestion;
+    }
+
+    if (!defined(lastFieldValue)) {
+      fieldValues = [suggestion];
+    }
+
+    this.setState(
+      {
+        fieldValues,
+        showSuggestions: false,
+        activeSuggestion: 0,
+      },
+      () => {
+        this.handleChangeParentValue();
+      }
+    );
   };
 
   handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    const {fieldValues} = this.state;
+    const {fieldValues, activeSuggestion, suggestions} = this.state;
+
+    console.log('event.keyCode', event.keyCode);
+
+    if (event.keyCode === 13) {
+      console.log('suggestion', suggestions[activeSuggestion]);
+      this.handleClickSuggestionItem(suggestions[activeSuggestion])();
+      return;
+    }
+
+    if (event.keyCode === 38) {
+      if (activeSuggestion === 0) {
+        return;
+      }
+      this.setState({activeSuggestion: activeSuggestion - 1});
+      return;
+    }
+
+    if (event.keyCode === 40) {
+      if (activeSuggestion === suggestions.length - 1) {
+        return;
+      }
+      this.setState({activeSuggestion: activeSuggestion + 1});
+      return;
+    }
 
     if (event.keyCode === 32) {
       this.setState({
         fieldValues: [...fieldValues, ' '],
       });
+      return;
     }
+  };
+
+  handleFocus = () => {
+    this.setState({
+      showSuggestions: true,
+    });
   };
 
   render() {
     const {error, onBlur, disabled, value} = this.props;
-    const {showOptions, suggestions} = this.state;
+    const {showSuggestions, suggestions, activeSuggestion} = this.state;
 
     return (
       <Wrapper ref={this.selectorField}>
@@ -184,7 +213,6 @@ class DataPrivacyRulesPanelSelectorField extends React.Component<Props, State> {
           placeholder={t('ex. strings, numbers, custom')}
           onChange={this.handleChange}
           autoComplete="off"
-          autoFocus
           value={value}
           onKeyDown={this.handleKeyDown}
           error={error}
@@ -192,12 +220,13 @@ class DataPrivacyRulesPanelSelectorField extends React.Component<Props, State> {
           onFocus={this.handleFocus}
           disabled={disabled}
         />
-        {showOptions && suggestions.length > 0 && (
+        {showSuggestions && suggestions.length > 0 && (
           <SuggestionsWrapper>
-            {suggestions.map(suggestion => (
+            {suggestions.map((suggestion, index) => (
               <SuggestionItemWrapper
                 key={suggestion.value}
                 onClick={this.handleClickSuggestionItem(suggestion)}
+                active={index === activeSuggestion}
               >
                 <Tooltip
                   title={`${suggestion.value} ${suggestion?.description &&
@@ -260,12 +289,12 @@ const SuggestionsWrapper = styled('ul')`
   overflow-y: auto;
 `;
 
-const SuggestionItemWrapper = styled('li')`
+const SuggestionItemWrapper = styled('li')<{active: boolean}>`
   border-bottom: 1px solid ${p => p.theme.borderLight};
   padding: ${space(1)} ${space(2)};
-  font-size: ${p => p.theme.fontSizeSmall};
-  font-family: ${p => p.theme.text.familyMono};
+  font-size: ${p => p.theme.fontSizeMedium};
   cursor: pointer;
+  background: ${p => (p.active ? p.theme.offWhiteLight : p.theme.white)};
   :hover {
     background: ${p => p.theme.offWhite};
   }

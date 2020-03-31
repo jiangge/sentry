@@ -1,5 +1,6 @@
 import PropTypes from 'prop-types';
 import React from 'react';
+import omit from 'lodash/omit';
 
 import FormField from 'app/components/forms/formField';
 
@@ -25,7 +26,7 @@ export default class InputField<
   getField() {
     return (
       <input
-        {...this.props}
+        {...omit(this.props, 'hideErrorMessage')}
         id={this.getId()}
         type={this.getType()}
         className="form-control"
